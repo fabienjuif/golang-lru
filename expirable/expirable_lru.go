@@ -75,9 +75,6 @@ func NewLRU[K comparable, V any](size int, onEvict EvictCallback[K, V], ttl time
 	}
 
 	// enable deleteExpired() running in separate goroutine for cache with non-zero TTL
-	//
-	// Important: done channel is never closed, so deleteExpired() goroutine will never exit,
-	// it's decided to add functionality to close it in the version later than v2.
 	if res.ttl != noEvictionTTL {
 		go func(done <-chan struct{}) {
 			ticker := time.NewTicker(res.ttl / numBuckets)
@@ -93,6 +90,14 @@ func NewLRU[K comparable, V any](size int, onEvict EvictCallback[K, V], ttl time
 		}(res.done)
 	}
 	return &res
+}
+
+// Close stops the cleanup goroutine.
+// Once closed, the cache should not be used again.
+func (c *LRU[K, V]) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	close(c.done)
 }
 
 // Purge clears the cache completely.
